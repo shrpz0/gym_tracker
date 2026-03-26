@@ -4,6 +4,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import Workout, Set, Exercise, ExerciseSecondaryMuscle
 from .serializers import WorkoutSerializer, SetSerializer, ExerciseSecondaryMuscleSerializer, ExerciseSerializer
+from django.utils import timezone
+from .utils import get_week_range, get_month_range
+from .services import get_review
 
 class SetViewSet(ModelViewSet):
     queryset = Set.objects.all()
@@ -23,7 +26,25 @@ class WorkoutViewSet(ModelViewSet):
 
 class AggregateWorkoutsAPIView(APIView):
     def get(self, request, scope):
-        if scope == "day":
-            return Response({"G":"DL"})
-        return Response({"Loser":"DL"})
+        user = request.user
+
+        if scope == "week":
+            today = timezone.localdate()
+            start_dt, end_dt = get_week_range(today)
+            return Response(
+                data=get_review(
+                    start_date=start_dt, end_date=end_dt, user=user
+                    )
+                )
+
+        elif scope == "month":
+            today = timezone.localdate()
+            start_dt, end_dt = get_month_range(today)
+            return Response(
+                data=get_review(
+                    start_date=start_dt, end_date=end_dt, user=user
+                )
+            )
+        
+
         

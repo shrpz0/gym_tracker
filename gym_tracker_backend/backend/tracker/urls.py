@@ -11,5 +11,5 @@ router.register(r"ExerciseSecondaryMuscle", ExerciseSecondaryMuscleViewSet)
 
 urlpatterns = [
     path("", include(router.urls)),
-    path("analytics/aggregate_workouts/<int:scope>/", AggregateWorkoutsAPIView.as_view())
+    path("analytics/aggregate_workouts/<str:scope>/", AggregateWorkoutsAPIView.as_view())
 ]

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Set, Workout, Exercise, ExerciseSecondaryMuscle, ExerciseSecondaryLink
 from django.db import transaction
+from django.utils import timezone
 
 class ExerciseSecondaryMuscleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -70,6 +71,11 @@ class WorkoutSerializer(serializers.ModelSerializer):
 
         read_only_fields = ["user"]
     
+    def validate_logged_at(self, value):
+        if value is None:
+            return timezone.now()
+        return value
+    
     def create(self, validated_data):
         user = self.context["request"].user
         return Workout.objects.create(user=user, **validated_data)
@@ -87,6 +93,7 @@ class SetSerializer(serializers.ModelSerializer):
             "reps", 
             "weight", 
             "unit", 
+            "weight_kg",
             "rir", 
             "workout"
         ]

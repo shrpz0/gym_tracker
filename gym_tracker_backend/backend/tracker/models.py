@@ -18,6 +18,9 @@ class MuscleGroup(models.TextChoices):
     HAMSTRINGS = "HAMSTRINGS", "Hamstrings"
     GLUTES = "GLUTES", "Glutes"
     CALVES = "CALVES", "Calves"
+    NECK = "NECK", "Neck"
+    FOREARMS = "FOREARMS", "Forearms"
+
 
 class MovementPattern(models.TextChoices):
     PUSH = "PUSH", "Push"
@@ -47,6 +50,10 @@ class StrengthLevel(models.TextChoices):
 class Sex(models.TextChoices):
     M = "M", "Male"
     F = "F", "Female"
+
+class PRType(models.TextChoices):
+    ESTIMATED = "ESTIMATED", "Estimated"
+    ACTUAL = "ACTUAL", "Actual"
 
 
 class Exercise(models.Model):
@@ -132,7 +139,7 @@ class Set(models.Model):
         else:
             raise ValueError("Unsuported Unit")
         
-        return super.save(*args, **kwargs)
+        return super().save(*args, **kwargs)
 
     class Meta:
         indexes = [
@@ -143,6 +150,16 @@ class Tag(models.Model):
     name = models.CharField(max_length=50)
     workout = models.ForeignKey(Workout, on_delete=models.CASCADE, related_name="tags")
 
+
+class PR(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE)
+    weight_kg = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(0)])
+    pr_type = models.CharField(choices=PRType.choices)
+    achieved_at = models.DateField(default=timezone.now, null=False)
+
+    class Meta:
+        unique_together = ["user", "exercise", "pr_type"]
 
 # Strength standards in relation to bodyweight to implement for exercises
 # Storing user's PRs?
