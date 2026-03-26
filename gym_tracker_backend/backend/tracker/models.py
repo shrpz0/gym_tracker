@@ -53,7 +53,7 @@ class Sex(models.TextChoices):
 
 class PRType(models.TextChoices):
     ESTIMATED = "ESTIMATED", "Estimated"
-    ACTUAL = "ACTUAL", "Actual"
+    ACTUAL = "REAL", "Real"
 
 
 class Exercise(models.Model):
@@ -122,13 +122,13 @@ class Workout(models.Model):
 
 
 class Set(models.Model):
-
     exercise = models.ForeignKey(Exercise, on_delete=models.PROTECT)
     reps = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(200)])
     weight = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(0)])
     weight_kg = models.DecimalField(max_digits=6, decimal_places=2, editable=False)
     unit = models.CharField(max_length=2, choices=WeightUnit.choices, default=WeightUnit.KG)
     rir = models.PositiveSmallIntegerField(null=True, blank=True)
+    estimated_1rm_kg = models.DecimalField(max_digits=6, decimal_places=2, null=True)
     workout = models.ForeignKey(Workout, on_delete=models.CASCADE, related_name="sets")
 
     def save(self, *args, **kwargs):
@@ -156,10 +156,13 @@ class PR(models.Model):
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE)
     weight_kg = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(0)])
     pr_type = models.CharField(choices=PRType.choices)
-    achieved_at = models.DateField(default=timezone.now, null=False)
+    achieved_at = models.DateTimeField(default=timezone.now, null=False)
 
     class Meta:
         unique_together = ["user", "exercise", "pr_type"]
+        indexes = [
+            models.Index(fields=["user", "exercise"]),
+        ]
 
 # Strength standards in relation to bodyweight to implement for exercises
 # Storing user's PRs?

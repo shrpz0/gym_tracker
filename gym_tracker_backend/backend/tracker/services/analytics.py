@@ -1,8 +1,8 @@
-from .models import Workout, Set
+from ..models import Workout, Set
 from django.db.models import Count, Sum, F, ExpressionWrapper, DecimalField, Q
 from django.db.models.functions import Coalesce
 from decimal import Decimal
-from .utils import safe_ratio
+from ..utils import safe_ratio
 
 ### Review focusing mostly on analytics, returns:
     # Number of total sets
@@ -38,7 +38,6 @@ def get_review(start_date, end_date, user):
         n_strength_sets=Count("id", filter=Q(reps__lte=6)),
         n_hypertrophy_sets=Count("id", filter=Q(reps__range=(7, 12))),
         n_endurance_sets=Count("id", filter=Q(reps__gt=12)),
-        
     )
 
     ### Number of Workouts

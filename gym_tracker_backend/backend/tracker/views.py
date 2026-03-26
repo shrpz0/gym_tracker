@@ -6,11 +6,16 @@ from .models import Workout, Set, Exercise, ExerciseSecondaryMuscle
 from .serializers import WorkoutSerializer, SetSerializer, ExerciseSecondaryMuscleSerializer, ExerciseSerializer
 from django.utils import timezone
 from .utils import get_week_range, get_month_range
-from .services import get_review
+from .services.analytics import get_review
+from .services.prs import update_pr_for_set
 
 class SetViewSet(ModelViewSet):
     queryset = Set.objects.all()
     serializer_class = SetSerializer
+
+    def perform_create(self, serializer):
+        set_instance = serializer.save()
+        update_pr_for_set(set_instance)
 
 class ExerciseViewSet(ModelViewSet):
     queryset = Exercise.objects.all()

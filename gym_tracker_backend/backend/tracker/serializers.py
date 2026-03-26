@@ -2,6 +2,8 @@ from rest_framework import serializers
 from .models import Set, Workout, Exercise, ExerciseSecondaryMuscle, ExerciseSecondaryLink
 from django.db import transaction
 from django.utils import timezone
+from .models import LB_TO_KG, WeightUnit
+from .utils import get_1RM_avg
 
 class ExerciseSecondaryMuscleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -90,14 +92,21 @@ class SetSerializer(serializers.ModelSerializer):
         fields = [
             "exercise_id",
             "exercise", 
-            "reps", 
-            "weight", 
-            "unit", 
+            "reps",
+            "weight",
+            "unit",
+            "estimated_1rm_kg",
             "weight_kg",
             "rir", 
-            "workout"
+            "workout",
+        ]
+
+        read_only_fields = [
+            "estimated_1rm_kg"
         ]
     
+        
+        
     def validate_exercise_id(self, id):
         if id < 1:
             raise serializers.ValidationError("Incorrect Id")
@@ -105,5 +114,17 @@ class SetSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         ex_id = validated_data.pop("exercise_id")
-        return Set.objects.create(exercise_id=ex_id, **validated_data)
+
+        if validated_data["unit"] == WeightUnit.LB:
+            weight_kg = round(validated_data["weight"] * LB_TO_KG, 2)
+        else:
+            weight_kg = validated_data["weight"]
+
+        if validated_data["reps"] > 1:
+            rm = get_1RM_avg(weight_kg, validated_data["reps"])
+        else:
+            rm = weight_kg
+
+
+        return Set.objects.create(exercise_id=ex_id, estimated_1rm_kg=rm, **validated_data)
         
