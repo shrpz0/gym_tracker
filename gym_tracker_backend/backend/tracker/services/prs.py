@@ -7,7 +7,9 @@ from django.utils import timezone
 def update_pr_for_set(set_instance):
     user = set_instance.workout.user
     exercise = set_instance.exercise
-    rm = set_instance.estimated_1rm_kg
+    w_kg = set_instance.weight_kg
+    e1rm = set_instance.estimated_1rm_kg
+    dt = set_instance.workout.logged_at
 
     if set_instance.reps == 1:
         real_pr = (           
@@ -19,19 +21,42 @@ def update_pr_for_set(set_instance):
         ).first()
 
         if real_pr:
-            if real_pr.weight_kg < rm:
-                real_pr.weight_kg = set_instance.weight_kg
-                real_pr.achieved_at = timezone.now()
+            if real_pr.weight_kg < w_kg:
+                real_pr.weight_kg = w_kg
+                real_pr.achieved_at = dt
                 real_pr.save()
+
+                return {
+                    "pr_updated" : True,
+                    "pr_type" : "REAL",
+                    "old_value" : real_pr.weight_kg,
+                    "new_value" : w_kg,
+                    "exercise_name" : set_instance.exercise.name,
+                    "exercise_id" : set_instance.exercise_id
+                }
+            
+            return {
+                "pr_updated" : False
+            }
+
 
         else:
             PR.objects.create(
                 user=user,
                 exercise=exercise,
                 pr_type="ACTUAL",
-                weight_kg=set_instance.weight_kg,
-                achieved_at=timezone.now()
+                weight_kg=w_kg,
+                achieved_at=dt
         )
+            
+            return {
+                "pr_updated" : True,
+                "pr_type" : "REAL",
+                "old_value" : None,
+                "new_value" : w_kg,
+                "exercise_name" : set_instance.exercise.name,
+                "exercise_id" : set_instance.exercise_id
+                }
         
     else:
         estimated_pr = (
@@ -44,19 +69,40 @@ def update_pr_for_set(set_instance):
 
 
         if estimated_pr:
-            if estimated_pr.weight_kg < rm:
-                estimated_pr.weight_kg = rm
-                estimated_pr.achieved_at = timezone.now()
+            if estimated_pr.weight_kg < e1rm:
+                estimated_pr.weight_kg = e1rm
+                estimated_pr.achieved_at = dt
                 estimated_pr.save()
+            
+                return {
+                    "pr_updated" : True,
+                    "pr_type" : "ESTIMATED",
+                    "old_value" : estimated_pr.weight_kg,
+                    "new_value" : e1rm,
+                    "exercise_name" : set_instance.exercise.name,
+                    "exercise_id" : set_instance.exercise_id
+                }
+            
+            return {
+                "pr_updated" : False
+            }
 
         else:
             PR.objects.create(
                 user=user,
                 exercise=exercise,
-                type_pr="ESTIMATED",
-                weight_kg=rm,
-                achieved_at=timezone.now()
+                pr_type="ESTIMATED",
+                weight_kg=e1rm,
+                achieved_at=dt
         )
+            return {
+                    "pr_updated" : True,
+                    "pr_type" : "ESTIMATED",
+                    "old_value" : None,
+                    "new_value" : e1rm,
+                    "exercise_name" : set_instance.exercise.name,
+                    "exercise_id" : set_instance.exercise_id
+                }
 
 
 

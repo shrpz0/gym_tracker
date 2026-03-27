@@ -8,14 +8,30 @@ from django.utils import timezone
 from .utils import get_week_range, get_month_range
 from .services.analytics import get_review
 from .services.prs import update_pr_for_set
+from rest_framework import status
 
 class SetViewSet(ModelViewSet):
     queryset = Set.objects.all()
     serializer_class = SetSerializer
 
-    def perform_create(self, serializer):
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         set_instance = serializer.save()
-        update_pr_for_set(set_instance)
+
+        pr_result = update_pr_for_set(set_instance)
+        response_serializer = self.get_serializer(set_instance)
+        success_headers = self.get_success_headers(response_serializer.data)
+
+        return Response(
+            {
+                "set" : response_serializer.data,
+                "pr_event" : pr_result
+            },
+            status=status.HTTP_201_CREATED,
+            headers=success_headers
+        )
+
 
 class ExerciseViewSet(ModelViewSet):
     queryset = Exercise.objects.all()

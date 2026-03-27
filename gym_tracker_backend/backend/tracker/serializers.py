@@ -124,7 +124,7 @@ class SetSerializer(serializers.ModelSerializer):
             rm = get_1RM_avg(weight_kg, validated_data["reps"])
         else:
             rm = weight_kg
-
+    
 
         return Set.objects.create(exercise_id=ex_id, estimated_1rm_kg=rm, **validated_data)
         
