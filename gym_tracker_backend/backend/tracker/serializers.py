@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Set, Workout, Exercise, ExerciseSecondaryMuscle, ExerciseSecondaryLink
+from .models import Set, Workout, Exercise, ExerciseSecondaryMuscle, ExerciseSecondaryLink, PR
 from django.db import transaction
 from django.utils import timezone
 from .models import LB_TO_KG, WeightUnit
@@ -128,3 +128,17 @@ class SetSerializer(serializers.ModelSerializer):
 
         return Set.objects.create(exercise_id=ex_id, estimated_1rm_kg=rm, **validated_data)
         
+class PRSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PR
+        fields = [
+            "user_id",
+            "exercise_id",
+            "weight_kg",
+            "achieved_at",
+            "pr_type"
+        ]
+        read_only_fields = [
+            "user_id",
+            "exercise_id"
+        ]

@@ -2,8 +2,8 @@ from django.shortcuts import render
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from .models import Workout, Set, Exercise, ExerciseSecondaryMuscle
-from .serializers import WorkoutSerializer, SetSerializer, ExerciseSecondaryMuscleSerializer, ExerciseSerializer
+from .models import Workout, Set, Exercise, ExerciseSecondaryMuscle, PR
+from .serializers import WorkoutSerializer, SetSerializer, ExerciseSecondaryMuscleSerializer, ExerciseSerializer, PRSerializer
 from django.utils import timezone
 from .utils import get_week_range, get_month_range
 from .services.analytics import get_review
@@ -68,4 +68,6 @@ class AggregateWorkoutsAPIView(APIView):
             )
         
 
-        
+class PRViewSet(ModelViewSet):
+    queryset = PR.objects.all()
+    serializer_class = PRSerializer
