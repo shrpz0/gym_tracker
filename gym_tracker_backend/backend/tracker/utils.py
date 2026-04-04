@@ -55,7 +55,7 @@ def get_1RM_epley(weight_kg: Decimal, reps: int):
 ### Estimates 1RM according to Epleys Formula
 def get_1RM_brzycki(weight_kg: Decimal, reps: int):
     return (weight_kg*Decimal(36))/(Decimal(37)-reps)
-
+ 
 ### Average of the two formulas
 def get_1RM_avg(weight_kg, reps: int) -> Decimal:
     epley = get_1RM_epley(weight_kg, reps)

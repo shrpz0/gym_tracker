@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import Set, Workout, Exercise, ExerciseSecondaryMuscle, ExerciseSecondaryLink, PR
+from .models import (Set, Workout, Exercise, ExerciseSecondaryMuscle, 
+                     ExerciseSecondaryLink, PR, StrengthStandard, 
+                     Profile, MuscleStrengthIndicator, ExerciseStrengthEvaluation
+                    )
 from django.db import transaction
 from django.utils import timezone
 from .models import LB_TO_KG, WeightUnit
@@ -90,6 +93,7 @@ class SetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Set
         fields = [
+            "id",
             "exercise_id",
             "exercise", 
             "reps",
@@ -129,16 +133,65 @@ class SetSerializer(serializers.ModelSerializer):
         return Set.objects.create(exercise_id=ex_id, estimated_1rm_kg=rm, **validated_data)
         
 class PRSerializer(serializers.ModelSerializer):
+    exercise = ExerciseSerializer(many=False, read_only=True)
+    exercise_id = serializers.PrimaryKeyRelatedField(
+        queryset=Exercise.objects.all(),
+        source="exercise",
+        write_only=True
+    )
     class Meta:
         model = PR
         fields = [
-            "user_id",
+            "user",
             "exercise_id",
+            "exercise",
             "weight_kg",
             "achieved_at",
+            "pr_set",
             "pr_type"
         ]
         read_only_fields = [
             "user_id",
-            "exercise_id"
+            "exercise_id",
+        ]
+
+
+class StrengthStandardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StrengthStandard
+        fields = [
+            "exercise",
+            "level",
+            "bw_multiplier",
+            "sex"
+        ]
+
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        fields = [
+            "user",
+            "bodyweight_kg",
+            "preferred_unit",
+            "sex"
+        ]
+
+class MuscleStrengthIndicatorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MuscleStrengthIndicator
+        fields = [
+            "exercise",
+            "muscle_group",
+            "indicator_weight"
+        ]
+
+class ExerciseStrengthEvaluationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExerciseStrengthEvaluation
+        fields = [
+            "user",
+            "exercise",
+            "pr",
+            "strength_level",
+            "evaluated_at"
         ]
