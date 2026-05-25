@@ -2,10 +2,9 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
-from decimal import Decimal, ROUND_HALF_UP
-
-
-
+from decimal import Decimal
+from .utils import round_decimal
+from django.conf import settings
 
 
 LB_TO_KG = Decimal("0.45359237")
@@ -26,13 +25,19 @@ class MuscleGroup(models.TextChoices):
 
 
 class MovementPattern(models.TextChoices):
-    PUSH = "PUSH", "Push"
-    PULL = "PULL", "Pull"
-    SQUAT = "SQUAT", "Squat pattern"
-    HINGE = "HINGE", "Hinge pattern"
+    VERTICAL_PUSH = "VERTICAL_PUSH", "Vertical Push"
+    HORIZONTAL_PUSH = "HORIZONTAL_PUSH", "Horizontal Push"
+
+    VERTICAL_PULL = "VERTICAL_PULL", "Vertical Pull"
+    HORIZONTAL_PULL = "HORIZONTAL_PULL", "Horizontal Pull"
+
+    SQUAT = "SQUAT", "Squat"
+    HINGE = "HINGE", "Hinge"
+
     CARRY = "CARRY", "Carry"
     CORE = "CORE", "Core"
     OTHER = "OTHER", "Other"
+
 
 class Region(models.TextChoices):
     UPPER = "UPPER", "Upper"
@@ -50,6 +55,12 @@ class StrengthLevel(models.TextChoices):
     ADVANCED = "ADVANCED", "Advanced"
     ELITE = "ELITE", "Elite"
 
+class PRResultConfidence(models.TextChoices):
+    HIGH = "HIGH", "High"
+    MEDIUM = "MEDIUM", "Medium"
+    LOW = "LOW", "Low"
+
+
 LEVEL_TO_NUM = {
     StrengthLevel.BEGINNER : 1,
     StrengthLevel.NOVICE : 2,
@@ -58,17 +69,23 @@ LEVEL_TO_NUM = {
     StrengthLevel.ELITE : 5
 }
 
+
 class Sex(models.TextChoices):
     M = "M", "Male"
     F = "F", "Female"
 
-class PRType(models.TextChoices):
-    ESTIMATED = "ESTIMATED", "Estimated"
-    REAL = "REAL", "Real"
+class PRInvalidationReason(models.TextChoices):
+    EXPIRED = "EXPIRED", "Expired"
+    BEATEN = "BEATEN", "Beaten"
+
+class PRStatus(models.TextChoices):
+    ACTIVE = "ACTIVE", "Active"
+    INVALIDATED = "INVALIDATED", "Invalidated"
+
 
 
 class Exercise(models.Model):
-    name = models.CharField(max_length=30, unique=True)
+    name = models.CharField(max_length=50, unique=True)
     primary_muscle = models.CharField(max_length=15, choices=MuscleGroup.choices)
     secondary_muscles = models.ManyToManyField(
             "ExerciseSecondaryMuscle",
@@ -77,7 +94,7 @@ class Exercise(models.Model):
             blank=True,
     )
 
-    pattern = models.CharField(max_length=10, choices=MovementPattern.choices)
+    pattern = models.CharField(max_length=15, choices=MovementPattern.choices)
     region = models.CharField(max_length=10, choices=Region.choices)
     is_compound = models.BooleanField(default=True)
     
@@ -91,8 +108,8 @@ class Exercise(models.Model):
 
 class MuscleStrengthIndicator(models.Model):
     muscle_group = models.CharField(max_length=15, choices=MuscleGroup.choices)
-    exercise = models.OneToOneField(Exercise, on_delete=models.CASCADE)
-    indicator_weight = models.DecimalField(decimal_places=2, max_digits=4, default=1.0)
+    exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, related_name="muslce_strength_indicators")
+    indicator_weight = models.DecimalField(decimal_places=2, max_digits=4, default=Decimal("1.00"))
 
 
 class ExerciseSecondaryMuscle(models.Model):
@@ -132,27 +149,26 @@ class Workout(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.user.username} - {self.logged_at}"
+        return f"{self.user.username} - {self.logged_at.date()}"
     
 
 
 class Set(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     exercise = models.ForeignKey(Exercise, on_delete=models.PROTECT, related_name="sets")
+    logged_at = models.DateTimeField(default=timezone.now, null=True, blank=True)
     reps = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(200)])
     weight = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(0)])
     weight_kg = models.DecimalField(max_digits=6, decimal_places=2, editable=False)
     unit = models.CharField(max_length=2, choices=WeightUnit.choices, default=WeightUnit.KG)
     rir = models.PositiveSmallIntegerField(null=True, blank=True)
-    estimated_1rm_kg = models.DecimalField(max_digits=6, decimal_places=2, null=True)
+    e1rm_kg = models.DecimalField(max_digits=6, decimal_places=2, null=True)
     workout = models.ForeignKey(Workout, on_delete=models.CASCADE, related_name="sets")
 
     def save(self, *args, **kwargs):
 
         if self.unit == WeightUnit.LB:
-            self.weight_kg = (self.weight * LB_TO_KG).quantize(
-                Decimal("0.01"),
-                rounding=ROUND_HALF_UP
-            )
+            self.weight_kg = round_decimal(self.weight * LB_TO_KG)
 
         elif self.unit == WeightUnit.KG:
             self.weight_kg = self.weight
@@ -167,40 +183,76 @@ class Set(models.Model):
             models.Index(fields=["workout", "exercise"]),
         ]
 
-class Tag(models.Model):
-    name = models.CharField(max_length=50)
-    workout = models.ForeignKey(Workout, on_delete=models.CASCADE, related_name="tags")
-
 
 class PR(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="prs")
-    pr_set = models.OneToOneField(Set, on_delete=models.CASCADE, related_name="pr")
+    bodyweight_kg = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(25), MaxValueValidator(500)])
+    source_set = models.OneToOneField(Set, on_delete=models.CASCADE, related_name="pr")
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, unique=False, related_name="prs")
     weight_kg = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(0)])
-    pr_type = models.CharField(choices=PRType.choices, max_length=9)
+    reps = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(8)])
+    e1rm_kg = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(0)])
     achieved_at = models.DateTimeField(default=timezone.now, null=False)
 
+    status = models.CharField(choices=PRStatus.choices, default=PRStatus.ACTIVE)
+    invalidation_reason = models.CharField(choices=PRInvalidationReason.choices, default=None, null=True, blank=True)
+    invalidated_at = models.DateTimeField(default=None, null=True, blank=True)
+    beaten_by = models.OneToOneField("self", default=None, null=True, blank=True, on_delete=models.SET_NULL, related_name="beaten_pr")
+
+    def achieved_weeks_ago(self):
+        delta = timezone.now() - self.achieved_at
+        return delta.days // 7
+    
+    def is_expired(self):
+        return self.achieved_weeks_ago() >= settings.PR_EXPIRATION_WEEKS
+    
 
     class Meta:
-        unique_together = ["user", "exercise", "pr_type"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "exercise"],
+                condition=models.Q(status="ACTIVE"),
+                name="unique_active_pr_per_user_exercise"
+            )
+        ]
         indexes = [
             models.Index(fields=["user", "exercise"]),
+            models.Index(fields=["achieved_at"])
         ]
+
+
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     sex = models.CharField(max_length=1, choices=Sex.choices)
-    bodyweight_kg = models.DecimalField(max_digits=5, decimal_places=2, validators=[MinValueValidator(25), MaxValueValidator(635)])
+    bodyweight_kg = models.DecimalField(max_digits=5, decimal_places=2, validators=[MinValueValidator(25), MaxValueValidator(500)])
     preferred_unit = models.CharField(max_length=2, choices=WeightUnit.choices, default=WeightUnit.KG)
-    
 
 class ExerciseStrengthEvaluation(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="strength_evaluations")
+    bodyweight_kg = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(25), MaxValueValidator(500)])
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, related_name="strength_evaluations")
     pr = models.OneToOneField(PR, on_delete=models.CASCADE, related_name="strength_evaluation")
-    source_pr_type = models.CharField(max_length=9, choices=PRType.choices)
     strength_level = models.CharField(max_length=12, choices=StrengthLevel.choices)
+    level_progress = models.DecimalField(max_digits=3, decimal_places=2)
+    score = models.DecimalField(max_digits=3, decimal_places=2, editable=False)
+    next_level = models.CharField(max_length=12, choices=StrengthLevel.choices)
     evaluated_at = models.DateTimeField(default=timezone.now)
 
+    def save(self, *args, **kwargs):
+        self.score = self.strength_level_decimal() + self.level_progress
+        return super().save(*args, **kwargs)
+    
+    def strength_level_decimal(self):
+        return Decimal(LEVEL_TO_NUM[self.strength_level])
+    
     class Meta:
         unique_together = [("user", "exercise")]
+        indexes = [models.Index(fields=["user", "exercise"])]
+
+
+### For invalidating
+## ON PRs GET:
+#       -use a replace_expired_prs function (to replace all expired prs) -> .filter(achieved_at__lt=cutoff) -> for each, replace_pr function 
+# ON StrengthProfile GET:
+#   -Strength Profile fetches PRs for strength indicative exercises -> Check with .is_expired() -> If yes -> replace_expired_pr (to replace a particular expired pr)

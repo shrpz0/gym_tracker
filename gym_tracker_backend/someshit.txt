@@ -1,0 +1,184 @@
+1. 
+For every sale row, show employee name, sale amount, and the total sales amount 
+for that employee across ALL their sales. Use PARTITION BY employee.
+
+---
+SELECT e.name,
+       s.amount,
+       sum(s.amount) OVER (PARTITION BY e.name) AS total_sales_amount
+FROM sales s JOIN employees e ON s.employee_id = e.employee_id
+---
+
+.....
+2. 
+For every employee, show their name, department_name (join it), salary, and the average salary 
+inside their own department. PARTITION BY department.
+
+---
+SELECT e.name, 
+       d.department_name, 
+       e.salary,
+       AVG(salary) OVER (PARTITION BY d.department_name) AS department_avg_salary
+FROM employees e
+     JOIN departments d ON e.department_id = d.department_id
+---
+
+.....
+3.
+Show every sale with sale_id, amount, region, and the total sales amount for that entire region 
+(repeat the total on every row in the region)
+
+---
+SELECT sale_id, 
+       amount, 
+       region,
+       SUM(amount) OVER (PARTITION BY region) AS region_total_sales_amount
+FROM sales
+---
+
+.....
+4.
+For every sale, show the employee name, amount, and how many sales that employee
+has made in total (COUNT window).
+
+---
+SELECT e.name,
+       s.amount,
+       COUNT(*) OVER (PARTITION BY e.name) AS employee_sales_count
+FROM employees e
+JOIN sales s
+ON e.employee_id = s.employee_id
+---
+
+.....
+5.
+Show every employee with their name, department, salary, and the maximum salary 
+inside their department (repeated on every row)
+
+---
+SELECT e.name, 
+       d.department_name, 
+       e.salary,
+       MAX(e.salary) OVER (PARTITION BY d.department_name) AS department_max_salary
+FROM employees e
+JOIN department d ON e.department_id = d.department_id
+---
+
+.....
+6.
+Rank all employees by salary DESC within their own department
+using RANK() OVER (PARTITION BY department ORDER BY salary DESC)
+
+---
+SELECT name, 
+       salary,
+       RANK() OVER (PARTITION BY department_id ORDER BY salary DESC) AS salary_inside_department_rank
+FROM employees
+---
+
+.....
+7.
+For each individual sale, rank the sales of that employee by amount DESC 
+(ROW_NUMBER() or RANK() partitioned by employee)
+
+---
+SELECT sale_id,
+       employee_id,
+       RANK() OVER (PARTITION BY employee_id ORDER BY amount DESC) AS sale_rank_employee
+FROM sales
+---
+
+.....
+8.
+For each sale, add a column showing the running total of sales amounts for that employee up to that sale_date.
+
+---
+SELECT sale_id,
+       employee_id,
+       SUM(amount) OVER (ORDER BY sale_date)
+FROM sales      
+---
+
+.....
+9.
+Show every sale with the overall running total of ALL company sales ordered by sale_date 
+
+---
+SELECT sale_id,
+       amount,
+       sale_date,
+       SUM(amount) OVER (ORDER BY sale_date, sale_id) AS running_total
+FROM sales      
+---
+
+.....
+10.
+Using LAG(), for each sale show the previous sale amount made by the same employee
+
+---
+SELECT sale_id,
+       amount,
+       sale_date,
+       employee_id
+       LAG(amount) OVER (PARTITION BY employee_id ORDER BY sale_date, sale_id) AS previous_sale_amount
+FROM sales      
+---
+
+.....
+11.
+Calculate the day-over-day difference for each employee’s sales: current amount minus previous amount
+
+---
+SELECT sale_id,
+       sale_date,
+       employee_id,
+       amount,
+       amount - LAG(amount) OVER (PARTITION BY employee_id ORDER BY sale_date, sale_id) AS day_over_day_diff
+FROM sales      
+---
+
+.....
+12.
+For each employee, calculate a 3-sale moving average of their sale amounts
+
+---
+SELECT sale_id,
+       employee_id,
+       sale_date,
+       amount,
+       AVG(amount) OVER (PARTITION BY employee_id ORDER BY sale_date
+                         RANGE BETWEEN INTERVAL '3' DAY PRECEDING AND CURRENT ROW) AS moving_3days_avg 
+FROM sales      
+---
+
+.....
+13.
+For every sale, show the amount and what percentage that sale is of the employee’s TOTAL sales.
+
+---
+SELECT sale_id,
+       employee_id,
+       amount,
+       100 * (amount / SUM(amount)) OVER(PARTITION BY employee_id) AS percentage_of_total_employee_sales
+FROM sales 
+---
+
+.....
+14.
+For each employee, show their name and the amount of their FIRST-EVER sale ever.
+
+---
+SELECT e.name,
+       FIRST_VALUE(s.amount) OVER (PARTITION BY s.employee_id ORDER BY sale_date
+                                  ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS employee_first_sale_amount
+FROM employee e JOIN sales s ON e.employee_id = s.employee_id
+---
+
+
+
+---
+Exercise 16: For each employee, show their salary and the PERCENT_RANK() of that salary inside their department.
+Exercise 17: For each sale, show the cumulative (running total) sales in that region up to that sale_date (partition by region + order by date).
+Exercise 18: Find the top 3 largest sales per department using ROW_NUMBER() OVER (PARTITION BY department ORDER BY amount DESC) and then filter where rank <= 3.
+Exercise 19: For every employee, show their salary and how much it differs from the department average salary (use AVG window and subtract).
+Exercise 20 (Warlord Final Boss): In one query (use a CTE if you want), for each sale show: sale amount, employee name, that employee’s total sales, the employee’s rank within their department by total sales, and the running total of sales in their region up to that date.

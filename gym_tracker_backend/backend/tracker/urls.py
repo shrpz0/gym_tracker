@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (ExerciseViewSet, ExerciseSecondaryMuscleViewSet,
                     WorkoutViewSet, SetViewSet, AggregateWorkoutsAPIView, 
                     PRViewSet, ProfileViewSet, StrengthStandardViewSet,
-                    MuscleStrengthIndicatorViewSet, ExerciseStrengthEvaluationViewSet)
+                    MuscleStrengthIndicatorViewSet, ExerciseStrengthEvaluationViewSet, StrengthProfileAPIView)
 
 router = DefaultRouter()
 router.register(r"Workout", WorkoutViewSet)
@@ -21,5 +21,6 @@ router.register(r"ExerciseStrengthEvaluation", ExerciseStrengthEvaluationViewSet
 
 urlpatterns = [
     path("", include(router.urls)),
-    path("analytics/aggregate_workouts/<str:scope>/", AggregateWorkoutsAPIView.as_view())
+    path("analytics/aggregate_workouts/<str:scope>/", AggregateWorkoutsAPIView.as_view()),
+    path("strengthprofile/", StrengthProfileAPIView.as_view())
 ]
