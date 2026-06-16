@@ -7,6 +7,13 @@ from dateutil.relativedelta import relativedelta
 
 #################################### DATES #####################################################
 
+def start_of_day(date_obj):
+    return datetime.combine(date_obj, datetime.min.time())
+
+def start_of_next_day(date_obj):
+    next_day = date_obj + timedelta(days=1)
+    return datetime.combine(next_day, datetime.min.time())
+
 def get_week_range(given_date: date):
     start_date = given_date - timedelta(days=given_date.weekday())
     end_date = start_date + timedelta(days=7)

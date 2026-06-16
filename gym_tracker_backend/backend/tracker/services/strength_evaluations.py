@@ -25,6 +25,10 @@ def update_exercise_strength_evaluation(pr_instance: PR, exercise=None, user=Non
 
     lifted_multiplier = get_lifted_multiplier(bodyweight=bodyweight_kg, weight_lifted=e1rm)
     standards = get_strength_standards(exercise=exercise, sex=user.profile.sex)
+
+    if standards is None:
+        return None
+    
     new_strength_level, level_threshold = get_level_and_threshold_from_standards(
         standards, 
         lifted_multiplier
@@ -161,4 +165,6 @@ def get_level_progress(multiplier, curr_threshold, next_threshold):
 
     progress = round_decimal((multiplier - curr_threshold) / (next_threshold - curr_threshold))
     return progress
+
+
 

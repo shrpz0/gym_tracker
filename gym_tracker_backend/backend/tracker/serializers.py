@@ -7,6 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 from .models import LB_TO_KG, WeightUnit
 from .utils import get_1RM_avg, get_weeks_passed
+from decimal import Decimal
 
 class ExerciseSecondaryMuscleSerializer(serializers.ModelSerializer):
     class Meta:
@@ -32,7 +33,8 @@ class ExerciseSerializer(serializers.ModelSerializer):
             "pattern", 
             "region", 
             "is_compound",
-            "secondary_muscles_ids"
+            "secondary_muscles_ids",
+            "is_bodyweight"
         ]
 
     def validate_secondary_muscles_ids(self, ids):
@@ -63,7 +65,23 @@ class ExerciseSerializer(serializers.ModelSerializer):
 
         return exercise
 
+class SetReadSerializer(serializers.ModelSerializer):
+    exercise = ExerciseSerializer(many=False, read_only=True)
+
+    class Meta:
+        model = Set
+        fields = [
+            "id",
+            "exercise",
+            "reps",
+            "weight",
+            "unit",
+            "e1rm_kg",
+            "rir"
+        ]   
+
 class WorkoutSerializer(serializers.ModelSerializer):
+    sets = SetReadSerializer(many=True, read_only=True)
     class Meta:
         model = Workout
         fields = [
@@ -71,10 +89,11 @@ class WorkoutSerializer(serializers.ModelSerializer):
             "user", 
             "logged_at", 
             "note", 
-            "rating"
+            "rating",
+            "sets"
         ]
 
-        read_only_fields = ["user"]
+        read_only_fields = ["user", "id", "sets"]
     
     def validate_logged_at(self, value):
         if value is None:
@@ -117,27 +136,52 @@ class SetSerializer(serializers.ModelSerializer):
             "weight_kg",
             "rir", 
             "workout",
+            "is_bodyweight"
         ]
 
         read_only_fields = [
             "e1rm_kg",
-            "logged_at"
+            "logged_at",
+            "weight_kg",
+            "is_bodyweight"
         ]
     
         
+    def validate(self, attrs):
+        exercise_id = attrs["exercise_id"]
+        try:
+            exercise_instance = Exercise.objects.get(id=exercise_id)
+        except Exercise.DoesNotExist:
+            raise serializers.ValidationError({"exercise_id": "Exercise with this ID does not exist"})
         
-    def validate_exercise_id(self, id):
-        if id < 1:
-            raise serializers.ValidationError("Incorrect Id")
-        return id
-    
+        attrs["exercise_instance"] = exercise_instance
+        is_bodyweight = exercise_instance.is_bodyweight
+        weight = attrs.get("weight", 0)
+
+        if is_bodyweight and weight > 0:
+            raise serializers.ValidationError(
+                {"weight": "Weight can only be 0 for bodyweight exercises"}
+            )
+        
+        elif not is_bodyweight and weight == 0:
+            raise serializers.ValidationError(
+                {"weight": "Weight cannot be 0 for weighted exercises"}
+            )
+        
+        ex_id = attrs.get("exercise_id")
+        if ex_id < 1:
+            raise serializers.ValidationError(
+                {"exercise_id": "Exercise with this ID does not exist"}
+            )
+        
+        return attrs
+
     def create(self, validated_data):
-        ex_id = validated_data.pop("exercise_id")
+        exercise_instance = validated_data.pop("exercise_instance")
+        is_bodyweight = exercise_instance.is_bodyweight
 
         validated_data.pop("user")
         user = self.context["request"].user
-
-    
 
         if validated_data["unit"] == WeightUnit.LB:
             weight_kg = round(validated_data["weight"] * LB_TO_KG, 2)
@@ -145,14 +189,26 @@ class SetSerializer(serializers.ModelSerializer):
             weight_kg = validated_data["weight"]
 
         if validated_data["reps"] > 1:
-            rm = get_1RM_avg(weight_kg, validated_data["reps"])
+            if is_bodyweight:
+                rm = None
+            else:    
+                rm = get_1RM_avg(weight_kg, validated_data["reps"])
+
         else:
             rm = weight_kg
 
         logged_at = validated_data["workout"].logged_at
 
-        return Set.objects.create(exercise_id=ex_id, user=user, e1rm_kg=rm, logged_at=logged_at, **validated_data)
-        
+        return Set.objects.create(
+            exercise=exercise_instance, 
+            user=user, 
+            e1rm_kg=rm, 
+            logged_at=logged_at, 
+            is_bodyweight=is_bodyweight, 
+            **validated_data
+        )
+     
+
 class PRSerializer(serializers.ModelSerializer):
     exercise = ExerciseSerializer(many=False, read_only=True)
     exercise_id = serializers.PrimaryKeyRelatedField(
@@ -177,7 +233,8 @@ class PRSerializer(serializers.ModelSerializer):
             "status",
             "invalidation_reason",
             "invalidated_at",
-            "beaten_by"
+            "beaten_by",
+            "pr_metric"
         ]
 
         read_only_fields = [

@@ -2,7 +2,7 @@ from .services.prs import invalidate_expired_prs
 from celery import shared_task
 from django.conf import settings
 
-@shared_task(bind=True, max_retries=3)
+@shared_task(bind=True, max_retries=1)
 def expire_prs_task(self):
     total_stats = {
         "candidates": 0,
@@ -13,7 +13,6 @@ def expire_prs_task(self):
         "errors": 0,
         "batches": 0,
     }
-
     batch_size = getattr(settings, "PR_EXPIRATION_BATCH_SIZE", 500)
 
     while True:

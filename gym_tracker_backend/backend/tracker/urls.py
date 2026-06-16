@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (ExerciseViewSet, ExerciseSecondaryMuscleViewSet,
-                    WorkoutViewSet, SetViewSet, AggregateWorkoutsAPIView, 
+                    WorkoutViewSet, SetViewSet, GetWorkoutStatsAPIView, 
                     PRViewSet, ProfileViewSet, StrengthStandardViewSet,
                     MuscleStrengthIndicatorViewSet, ExerciseStrengthEvaluationViewSet, StrengthProfileAPIView)
 
@@ -21,6 +21,6 @@ router.register(r"ExerciseStrengthEvaluation", ExerciseStrengthEvaluationViewSet
 
 urlpatterns = [
     path("", include(router.urls)),
-    path("analytics/aggregate_workouts/<str:scope>/", AggregateWorkoutsAPIView.as_view()),
+    path("analytics/stats/", GetWorkoutStatsAPIView.as_view(), name="workout-stats"),
     path("strengthprofile/", StrengthProfileAPIView.as_view())
 ]

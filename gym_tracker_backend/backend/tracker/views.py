@@ -1,8 +1,12 @@
 from django.shortcuts import render
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from django.utils.dateparse import parse_date
 from .permissions import IsOwner
+from .utils import start_of_day, start_of_next_day
+from .services.analytics import get_stats
 from .models import (Workout, Set, Exercise, ExerciseSecondaryMuscle,
                     PR, StrengthStandard, Profile,
                     MuscleStrengthIndicator, ExerciseStrengthEvaluation)
@@ -15,9 +19,9 @@ from .serializers import (WorkoutSerializer, SetSerializer,
                     )
 
 from django.utils import timezone
+from django.db.models import Prefetch
 from .utils import get_week_range, get_month_range
-from .services.analytics import get_review
-from .services.prs import handle_new_set, handle_set_deleted
+from .services.prs import handle_new_set, handle_set_deleted, handle_workout_deleted
 from rest_framework import status
 from .services.strength_evaluations import update_exercise_strength_evaluation
 from .services.strengthprofile import get_strength_profile
@@ -80,30 +84,66 @@ class WorkoutViewSet(ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return Workout.objects.filter(user=user)
+        
+        qs = (
+            Workout
+            .objects
+            .filter(user=user)
+            .prefetch_related(
+                Prefetch(
+                    "sets",
+                    queryset=(
+                        Set
+                        .objects
+                        .select_related("exercise")
+                        .prefetch_related("exercise__secondary_muscles"))
+                )
+            )
+        )
+
+        return qs
+    
+    def destroy(self, request, *args, **kwargs):
+        workout_instance = self.get_object()
+
+        data = handle_workout_deleted(workout_instance)
+
+        return Response({
+            "ACTION": "Workout DELETED",
+            "DETAIL": data
+        }, status=status.HTTP_200_OK)
+
+        
     
 
-class AggregateWorkoutsAPIView(APIView):
-    def get(self, request, scope):
+class GetWorkoutStatsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
         user = request.user
 
-        if scope == "week":
-            today = timezone.localdate()
-            start_dt, end_dt = get_week_range(today)
-            return Response(
-                data=get_review(
-                    start_date=start_dt, end_date=end_dt, user=user
-                    )
-                )
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
 
-        elif scope == "month":
-            today = timezone.localdate()
-            start_dt, end_dt = get_month_range(today)
-            return Response(
-                data=get_review(
-                    start_date=start_dt, end_date=end_dt, user=user
-                ), status=status.HTTP_200_OK
-            )
+        if not start_date or not end_date:
+            return ValidationError("start_date and end_date are required.")
+        
+        start_date = parse_date(start_date)
+        end_date = parse_date(end_date)
+
+        if not start_date or not end_date:
+            raise ValidationError("Invalid date format. Use YYYY-MM-DD.")
+        
+        if start_date >= end_date:
+            raise ValidationError("start_date must be before end_date.")
+        
+        start_dt = start_of_day(start_date)
+        end_dt = start_of_next_day(end_date)
+
+        data = get_stats(start_dt=start_dt, end_dt=end_dt, user=user)
+        return Response(data)
+
+
         
 class StrengthProfileAPIView(APIView):
     def get(self, request):

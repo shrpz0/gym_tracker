@@ -19,7 +19,7 @@ from django.db.models.functions import Coalesce
 
 
 def get_strength_profile(user_id):
-    """Compute realistic strength profile per muscle group.."""
+    """Compute a realistic strength profile per muscle group"""
     indicators_evals_qs = get_indicators_and_evals(user_id=user_id)
 
     muscle_groups = {}

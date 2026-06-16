@@ -60,6 +60,10 @@ class PRResultConfidence(models.TextChoices):
     MEDIUM = "MEDIUM", "Medium"
     LOW = "LOW", "Low"
 
+class PRMetric(models.TextChoices):
+    E1RM = "E1RM", "Estimated 1RM"
+    REPS = "REPS", "Reps"
+
 
 LEVEL_TO_NUM = {
     StrengthLevel.BEGINNER : 1,
@@ -97,6 +101,7 @@ class Exercise(models.Model):
     pattern = models.CharField(max_length=15, choices=MovementPattern.choices)
     region = models.CharField(max_length=10, choices=Region.choices)
     is_compound = models.BooleanField(default=True)
+    is_bodyweight = models.BooleanField(default=False)
     
     class Meta:
         indexes = [
@@ -105,6 +110,7 @@ class Exercise(models.Model):
 
     def __str__(self):
         return self.name
+    
 
 class MuscleStrengthIndicator(models.Model):
     muscle_group = models.CharField(max_length=15, choices=MuscleGroup.choices)
@@ -156,6 +162,7 @@ class Workout(models.Model):
 class Set(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     exercise = models.ForeignKey(Exercise, on_delete=models.PROTECT, related_name="sets")
+    is_bodyweight = models.BooleanField(default=False)
     logged_at = models.DateTimeField(default=timezone.now, null=True, blank=True)
     reps = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(200)])
     weight = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(0)])
@@ -190,14 +197,21 @@ class PR(models.Model):
     source_set = models.OneToOneField(Set, on_delete=models.CASCADE, related_name="pr")
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, unique=False, related_name="prs")
     weight_kg = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(0)])
-    reps = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(8)])
-    e1rm_kg = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(0)])
+    reps = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(200)])
+
+    e1rm_kg = models.DecimalField(
+        max_digits=6, decimal_places=2, validators=[MinValueValidator(0)], 
+        null=True, blank=True
+    )
+
     achieved_at = models.DateTimeField(default=timezone.now, null=False)
 
     status = models.CharField(choices=PRStatus.choices, default=PRStatus.ACTIVE)
     invalidation_reason = models.CharField(choices=PRInvalidationReason.choices, default=None, null=True, blank=True)
     invalidated_at = models.DateTimeField(default=None, null=True, blank=True)
     beaten_by = models.OneToOneField("self", default=None, null=True, blank=True, on_delete=models.SET_NULL, related_name="beaten_pr")
+
+    pr_metric = models.CharField(max_length=4, choices=PRMetric.choices, default=PRMetric.E1RM)
 
     def achieved_weeks_ago(self):
         delta = timezone.now() - self.achieved_at

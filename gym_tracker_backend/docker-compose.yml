@@ -35,7 +35,7 @@ services:
 
   celery:
     build: ./backend
-    command: celery -A gym_tracker_django worker -l info
+    command: celery -A gym_tracker_django worker --loglevel=info
     volumes:
       - ./backend:/app
     depends_on:
